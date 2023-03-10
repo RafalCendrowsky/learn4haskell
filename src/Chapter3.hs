@@ -52,6 +52,7 @@ provide more top-level type signatures, especially when learning Haskell.
 {-# LANGUAGE InstanceSigs #-}
 
 module Chapter3 where
+import GHC.Base (build)
 
 {-
 =🛡= Types in Haskell
@@ -344,6 +345,11 @@ of a book, but you are not limited only by the book properties we described.
 Create your own book type of your dreams!
 -}
 
+data Book = Book
+  { bookName   :: String
+  , bookAuthor :: String
+  } deriving (Show)
+
 {- |
 =⚔️= Task 2
 
@@ -375,6 +381,24 @@ after the fight. The battle has the following possible outcomes:
 ♫ NOTE: In this task, you need to implement only a single round of the fight.
 
 -}
+
+data Knight = Knight
+  { knightHealth :: Int
+  , knightAttack :: Int
+  , knightGold   :: Int
+  } deriving (Show)
+
+data Monster = Monster
+  { monsterHealth :: Int
+  , monsterAttack :: Int
+  , monsterGold   :: Int
+  } deriving (Show)
+
+fight :: Knight -> Monster -> Int
+fight k m
+  | knightAttack k >= monsterHealth m = monsterGold m + knightGold k
+  | knightHealth k <= monsterAttack m = -1
+  | otherwise = knightGold k
 
 {- |
 =🛡= Sum types
@@ -462,6 +486,12 @@ Create a simple enumeration for the meal types (e.g. breakfast). The one who
 comes up with the most number of names wins the challenge. Use your creativity!
 -}
 
+data Breakfast =
+  ScrambledEggs
+  | EnglishBreakfast
+  | Pancakes
+  | OatsAndYoghurt
+
 {- |
 =⚔️= Task 4
 
@@ -481,6 +511,44 @@ After defining the city, implement the following functions:
    complicated task, walls can be built only if the city has a castle
    and at least 10 living __people__ inside in all houses of the city in total.
 -}
+
+data Castle = Castle { castleName :: String } deriving Show
+data Wall = Wall deriving Show
+data Building =
+  Building |
+  BuildingCastle Castle |
+  BuildingCastleWall Castle Wall
+  deriving Show
+data ChurchOrLibrary = Church | Library deriving Show
+data People =
+  One
+  | Two
+  | Three
+  | Four deriving Show
+data House = House { houseOccupants :: People} deriving Show
+data City = City Building ChurchOrLibrary [House] deriving Show
+buildCastle :: City -> String -> City
+buildCastle (City x y z) newName = case x of
+  BuildingCastleWall _ wall -> City (BuildingCastleWall (Castle newName) wall) y z
+  _ -> City (BuildingCastle (Castle newName)) y z
+buildHouse :: House -> City -> City
+buildHouse house (City x y z) = City x y (house : z)
+getPeople :: People -> Int
+getPeople people = case people of
+  One -> 1
+  Two -> 2
+  Three -> 3
+  Four -> 4
+sumPeople :: [House] -> Int
+sumPeople = foldr ((+) . getPeople . houseOccupants) 0
+buildWalls :: City -> City
+buildWalls (City x y z) = case x of
+  BuildingCastle c -> if sumPeople z >= 10 then City (BuildingCastleWall c Wall) y z else City x y z
+  _ -> City x y z
+
+
+
+
 
 {-
 =🛡= Newtypes
@@ -562,22 +630,29 @@ introducing extra newtypes.
 🕯 HINT: if you complete this task properly, you don't need to change the
     implementation of the "hitPlayer" function at all!
 -}
+
+newtype Health = Health Int
+newtype Armor = Armor Int
+newtype Attack = Attack Int
+newtype Dexterity = Dexterity Int
+newtype Strength = Strength Int
+
 data Player = Player
-    { playerHealth    :: Int
-    , playerArmor     :: Int
-    , playerAttack    :: Int
-    , playerDexterity :: Int
-    , playerStrength  :: Int
+    { playerHealth    :: Health
+    , playerArmor     :: Armor
+    , playerAttack    :: Attack
+    , playerDexterity :: Dexterity
+    , playerStrength  :: Strength
     }
 
-calculatePlayerDamage :: Int -> Int -> Int
-calculatePlayerDamage attack strength = attack + strength
+calculatePlayerDamage :: Attack -> Strength -> Int
+calculatePlayerDamage (Attack attack) (Strength strength) = attack + strength
 
-calculatePlayerDefense :: Int -> Int -> Int
-calculatePlayerDefense armor dexterity = armor * dexterity
+calculatePlayerDefense :: Armor -> Dexterity -> Int
+calculatePlayerDefense (Armor armor) (Dexterity dexterity) = armor * dexterity
 
-calculatePlayerHit :: Int -> Int -> Int -> Int
-calculatePlayerHit damage defense health = health + defense - damage
+calculatePlayerHit :: Int -> Int -> Health -> Health
+calculatePlayerHit damage defense (Health health) =  Health (health + defense - damage)
 
 -- The second player hits first player and the new first player is returned
 hitPlayer :: Player -> Player -> Player
@@ -755,6 +830,14 @@ parametrise data types in places where values can be of any general type.
   maybe-treasure ;)
 -}
 
+newtype Dragon power = Dragon { dragonPower :: power }
+newtype Chest treasure = Chest { chestTreasure :: treasure }
+
+data Lair power treasure = Lair {
+  lairDragon :: Dragon power,
+  lairChest :: Maybe (Chest treasure)
+}
+
 {-
 =🛡= Typeclasses
 
@@ -912,6 +995,23 @@ Implement instances of "Append" for the following types:
 class Append a where
     append :: a -> a -> a
 
+newtype Gold = Gold Int deriving Show
+
+instance Append Gold where
+  append :: Gold -> Gold -> Gold
+  append (Gold x) (Gold y) = Gold (x + y)
+
+instance Append [a] where
+  append :: [a] -> [a] -> [a]
+  append x y = x ++ y
+
+instance (Append a) => Append (Maybe a) where
+  append :: Maybe a -> Maybe a -> Maybe a
+  append (Just x) (Just y) = Just (append x y)
+  append (Just x) Nothing = Just x
+  append Nothing (Just y) = Just y
+  append Nothing Nothing = Nothing
+
 
 {-
 =🛡= Standard Typeclasses and Deriving
@@ -973,6 +1073,28 @@ implement the following functions:
 🕯 HINT: to implement this task, derive some standard typeclasses
 -}
 
+data Day =
+  Monday
+  | Tuesday
+  | Wednesday
+  | Thursday
+  | Friday
+  | Saturday
+  | Sunday
+  deriving (Show, Enum, Eq)
+
+isWeekend :: Day -> Bool
+isWeekend day = day == Saturday || day == Sunday
+
+nextDay :: Day -> Day
+nextDay Sunday = Monday
+nextDay day = succ day
+
+daysToParty :: Day -> Int
+daysToParty = go 0 where
+  go :: Int -> Day -> Int
+  go acc day = if day == Friday then acc else go (acc + 1) (succ day)
+
 {-
 =💣= Task 9*
 
@@ -1007,6 +1129,22 @@ properties using typeclasses, but they are different data types in the end.
 Implement data types and typeclasses, describing such a battle between two
 contestants, and write a function that decides the outcome of a fight!
 -}
+
+class Fighter a where
+  getHit :: Int -> a -> a
+
+data FighterKnight = FighterKnight {
+  fighterKnightHealth :: Int,
+  fighterKnightAttack :: Int,
+  fighterKnightDefense :: Int
+} deriving Show
+
+instance Fighter FighterKnight where
+  getHit :: Int ->FighterKnight -> FighterKnight
+  getHit dmg knight =
+    if dmg > fighterKnightDefense knight
+    then knight { fighterKnightHealth = fighterKnightHealth knight - dmg + fighterKnightDefense knight }
+    else knight
 
 
 {-
