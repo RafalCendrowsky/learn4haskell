@@ -40,6 +40,7 @@ Perfect. Let's crush this!
 {-# LANGUAGE InstanceSigs    #-}
 
 module Chapter4 where
+import Distribution.Simple.Utils (xargs)
 
 {- |
 =🛡= Kinds
@@ -310,6 +311,13 @@ data List a
     = Empty
     | Cons a (List a)
 
+instance Show (List Integer)  where
+  show :: List Integer -> String
+  show Empty = ""
+  show (Cons x Empty) = show x
+  show (Cons x y) = show y ++ show x
+
+
 instance Functor List where
   fmap :: (a -> b) -> List a -> List b
   fmap _ Empty = Empty
@@ -484,6 +492,7 @@ instance Applicative (Secret e) where
 
     (<*>) :: Secret e (a -> b) -> Secret e a -> Secret e b
     Trap e <*> _ = Trap e
+    (Reward f) <*> x = fmap f x
 
 
 {- |
@@ -497,6 +506,24 @@ Implement the 'Applicative' instance for our 'List' type.
   may also need to implement a few useful helper functions for our List
   type.
 -}
+
+funcIter :: List (t -> a) -> t -> List a
+funcIter (Cons f fs) x = Cons (f x) (funcIter fs x)
+funcIter Empty _ = Empty
+
+listConcat :: List a -> List a -> List a
+listConcat x Empty = x
+listConcat Empty x = x
+listConcat ys (Cons x xs) = Cons x (listConcat ys xs)
+
+instance Applicative List where
+  pure :: a -> List a
+  pure x = Cons x Empty
+  (<*>) :: List (a -> b) -> List a -> List b
+  Empty <*> _ = Empty
+  _ <*> Empty = Empty
+  funcs <*> Cons x xy = listConcat (funcIter funcs x) (funcs <*> xy)
+
 
 
 {- |
@@ -609,7 +636,8 @@ Implement the 'Monad' instance for our 'Secret' type.
 -}
 instance Monad (Secret e) where
     (>>=) :: Secret e a -> (a -> Secret e b) -> Secret e b
-    (>>=) = error "bind Secret: Not implemented!"
+    Trap e >>= _ = Trap e
+    Reward x >>= f = f x
 
 {- |
 =⚔️= Task 7
@@ -619,7 +647,15 @@ Implement the 'Monad' instance for our lists.
 🕯 HINT: You probably will need to implement a helper function (or
   maybe a few) to flatten lists of lists to a single list.
 -}
+flatten :: List (List t) -> List t
+flatten Empty = Empty
+flatten (Cons x Empty) = x
+flatten (Cons x xs) = listConcat x (flatten xs)
 
+instance Monad List where
+  (>>=) :: List a -> (a -> List b) -> List b
+  Empty >>= _ = Empty
+  (Cons x xs) >>= f = listConcat (f x) (flatten (fmap f xs))
 
 {- |
 =💣= Task 8*: Before the Final Boss
